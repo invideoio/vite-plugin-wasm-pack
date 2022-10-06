@@ -67,8 +67,9 @@ function vitePluginWasmPack(
     name: 'vite-plugin-wasm-pack',
     enforce: 'pre',
     configResolved(resolvedConfig) {
+      console.log(resolvedConfig);
       config_base = resolvedConfig.base;
-      config_assetsDir = resolvedConfig.build.assetsDir;
+      config_assetsDir = `${resolvedConfig.build.assetsDir}/scripts`;
     },
 
     resolveId(id: string) {
@@ -185,7 +186,7 @@ function vitePluginWasmPack(
       wasmMap.forEach((crate, fileName) => {
         this.emitFile({
           type: 'asset',
-          fileName: `assets/${fileName}`,
+          fileName: `assets/scripts/${fileName}`,
           source: fs.readFileSync(crate.path)
         });
       });
