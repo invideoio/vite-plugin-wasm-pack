@@ -65,7 +65,6 @@ function vitePluginWasmPack(crates, moduleCrates) {
         name: 'vite-plugin-wasm-pack',
         enforce: 'pre',
         configResolved(resolvedConfig) {
-            console.log(resolvedConfig);
             config_base = resolvedConfig.base;
             config_assetsDir = `${resolvedConfig.build.assetsDir}/scripts`;
         },
