@@ -1,12 +1,7 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const chalk_1 = __importDefault(require("chalk"));
-const fs_extra_1 = __importDefault(require("fs-extra"));
-const narrowing_1 = require("narrowing");
-const path_1 = __importDefault(require("path"));
+import chalk from 'chalk';
+import fs from 'fs-extra';
+import { isString } from 'narrowing';
+import path from 'path';
 /**
  *   return a Vite plugin for handling wasm-pack crate
  *
@@ -32,15 +27,15 @@ function vitePluginWasmPack(crates, moduleCrates) {
     const pkg = 'pkg'; // default folder of wasm-pack module
     let config_base;
     let config_assetsDir;
-    const cratePaths = (0, narrowing_1.isString)(crates) ? [crates] : crates;
+    const cratePaths = isString(crates) ? [crates] : crates;
     const modulePaths = !moduleCrates
         ? []
-        : (0, narrowing_1.isString)(moduleCrates)
+        : isString(moduleCrates)
             ? [moduleCrates]
             : moduleCrates;
     // from ../../my-crate  ->  my_crate_bg.wasm
     const wasmFilename = (cratePath) => {
-        return path_1.default.basename(cratePath).replace(/\-/g, '_') + '_bg.wasm';
+        return path.basename(cratePath).replace(/\-/g, '_') + '_bg.wasm';
     };
     // wasmfileName : CrateType
     const wasmMap = new Map();
@@ -48,16 +43,16 @@ function vitePluginWasmPack(crates, moduleCrates) {
     cratePaths.forEach((cratePath) => {
         const wasmFile = wasmFilename(cratePath);
         wasmMap.set(wasmFile, {
-            path: path_1.default.join(cratePath, pkg, wasmFile),
+            path: path.join(cratePath, pkg, wasmFile),
             isNodeModule: false
         });
     });
     // 'my_crate_bg.wasm': { path: 'node_modules/my_crate/my_crate_bg.wasm', isNodeModule: true }
     modulePaths.forEach((cratePath) => {
         const wasmFile = wasmFilename(cratePath);
-        const wasmDirectory = path_1.default.dirname(require.resolve(cratePath));
+        const wasmDirectory = path.dirname(require.resolve(cratePath));
         wasmMap.set(wasmFile, {
-            path: path_1.default.join(wasmDirectory, wasmFile),
+            path: path.join(wasmDirectory, wasmFile),
             isNodeModule: true
         });
     });
@@ -70,7 +65,7 @@ function vitePluginWasmPack(crates, moduleCrates) {
         },
         resolveId(id) {
             for (let i = 0; i < cratePaths.length; i++) {
-                if (path_1.default.basename(cratePaths[i]) === id)
+                if (path.basename(cratePaths[i]) === id)
                     return prefix + id;
             }
             return null;
@@ -78,8 +73,8 @@ function vitePluginWasmPack(crates, moduleCrates) {
         async load(id) {
             if (id.indexOf(prefix) === 0) {
                 id = id.replace(prefix, '');
-                const modulejs = path_1.default.join('./node_modules', id, id.replace(/\-/g, '_') + '.js');
-                const code = await fs_extra_1.default.promises.readFile(modulejs, {
+                const modulejs = path.join('./node_modules', id, id.replace(/\-/g, '_') + '.js');
+                const code = await fs.promises.readFile(modulejs, {
                     encoding: 'utf-8'
                 });
                 return code;
@@ -88,26 +83,27 @@ function vitePluginWasmPack(crates, moduleCrates) {
         async buildStart(_inputOptions) {
             const prepareBuild = async (cratePath, isNodeModule) => {
                 const pkgPath = isNodeModule
-                    ? path_1.default.dirname(require.resolve(cratePath))
-                    : path_1.default.join(cratePath, pkg);
-                const crateName = path_1.default.basename(cratePath);
-                if (!fs_extra_1.default.existsSync(pkgPath)) {
+                    ? path.dirname(require.resolve(cratePath))
+                    : path.join(cratePath, pkg);
+                const crateName = path.basename(cratePath);
+                if (!fs.existsSync(pkgPath)) {
                     if (isNodeModule) {
-                        console.error(chalk_1.default.bold.red('Error: ') +
-                            `Can't find ${chalk_1.default.bold(pkgPath)}, run ${chalk_1.default.bold.red(`npm install ${cratePath}`)} first`);
+                        console.error(chalk.bold.red('Error: ') +
+                            `Can't find ${chalk.bold(pkgPath)}, run ${chalk.bold.red(`npm install ${cratePath}`)} first`);
                     }
                     else {
-                        console.error(chalk_1.default.bold.red('Error: ') +
-                            `Can't find ${chalk_1.default.bold(pkgPath)}, run ${chalk_1.default.bold.red(`wasm-pack build ${cratePath} --target web`)} first`);
+                        console.error(chalk.bold.red('Error: ') +
+                            `Can't find ${chalk.bold(pkgPath)}, run ${chalk.bold.red(`wasm-pack build ${cratePath} --target web`)} first`);
                     }
                 }
                 if (!isNodeModule) {
                     // copy pkg generated by wasm-pack to node_modules
                     try {
-                        await fs_extra_1.default.copy(pkgPath, path_1.default.join('node_modules', crateName));
+                        await fs.removeSync(path.join('node_modules', crateName));
+                        await fs.copy(pkgPath, path.join('node_modules', crateName));
                     }
                     catch (error) {
-                        this.error(`copy crates failed`);
+                        this.error(`copy crates failed: ${error}`);
                     }
                 }
                 // replace default load path with '/assets/xxx.wasm'
@@ -117,16 +113,16 @@ function vitePluginWasmPack(crates, moduleCrates) {
                  * cratePath === '@group/test'
                  * crateName === 'test'
                  */
-                let jsPath = path_1.default.join('./node_modules', crateName, jsName);
+                let jsPath = path.join('./node_modules', crateName, jsName);
                 if (isNodeModule) {
-                    jsPath = path_1.default.join(pkgPath, jsName);
+                    jsPath = path.join(pkgPath, jsName);
                 }
                 const regex = /input = new URL\('(.+)'.+;/g;
-                let code = fs_extra_1.default.readFileSync(path_1.default.resolve(jsPath), { encoding: 'utf-8' });
+                let code = fs.readFileSync(path.resolve(jsPath), { encoding: 'utf-8' });
                 code = code.replace(regex, (_match, group1) => {
-                    return `input = "${path_1.default.posix.join(config_base, config_assetsDir, group1)}"`;
+                    return `input = "${path.posix.join(config_base, config_assetsDir, group1)}"`;
                 });
-                fs_extra_1.default.writeFileSync(jsPath, code);
+                fs.writeFileSync(jsPath, code);
             };
             for await (const cratePath of cratePaths) {
                 await prepareBuild(cratePath, false);
@@ -136,23 +132,21 @@ function vitePluginWasmPack(crates, moduleCrates) {
             }
         },
         configureServer({ middlewares }) {
-            return () => {
-                // send 'root/pkg/xxx.wasm' file to user
-                middlewares.use((req, res, next) => {
-                    if ((0, narrowing_1.isString)(req.url)) {
-                        const basename = path_1.default.basename(req.url);
-                        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-                        const entry = wasmMap.get(basename);
-                        if (basename.endsWith('.wasm') && entry) {
-                            res.writeHead(200, { 'Content-Type': 'application/wasm' });
-                            fs_extra_1.default.createReadStream(entry.path).pipe(res);
-                        }
-                        else {
-                            next();
-                        }
+            // send 'root/pkg/xxx.wasm' file to user
+            middlewares.use((req, res, next) => {
+                if (isString(req.url)) {
+                    const basename = path.basename(req.url);
+                    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    const entry = wasmMap.get(basename);
+                    if (basename.endsWith('.wasm') && entry) {
+                        res.writeHead(200, { 'Content-Type': 'application/wasm' });
+                        fs.createReadStream(entry.path).pipe(res);
                     }
-                });
-            };
+                    else {
+                        next();
+                    }
+                }
+            });
         },
         buildEnd() {
             // copy xxx.wasm files to /assets/xxx.wasm
@@ -160,13 +154,13 @@ function vitePluginWasmPack(crates, moduleCrates) {
                 this.emitFile({
                     type: 'asset',
                     fileName: `assets/scripts/${fileName}`,
-                    source: fs_extra_1.default.readFileSync(crate.path)
+                    source: fs.readFileSync(crate.path)
                 });
             });
         }
     };
 }
-exports.default = vitePluginWasmPack;
+export default vitePluginWasmPack;
 // https://github.com/sveltejs/vite-plugin-svelte/issues/214
 if (typeof module !== 'undefined') {
     module.exports = vitePluginWasmPack;
